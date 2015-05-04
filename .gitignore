@@ -2,7 +2,7 @@
 
 *.iml
 
-.gen/
+gen/
 
 ## Directory-based project format:
 .idea/
