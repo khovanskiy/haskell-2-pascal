@@ -23,7 +23,7 @@ public class HaskellCoreMain {
         ParseTree tree = parser.program(); // parse
 
         ParseTreeWalker walker = new ParseTreeWalker(); // create standard walker
-        HaskellToPascalListener extractor = new HaskellToPascalListener(parser);
+        HaskellToPascalListener extractor = new HaskellToPascalListener(System.out);
         walker.walk(extractor, tree); // initiate walk of tree with listener
     }
 }

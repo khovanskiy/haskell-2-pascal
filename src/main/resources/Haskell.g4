@@ -25,8 +25,9 @@ locals [Set<String> args = new HashSet<String>();, int i = 0]
 
 cond : '|' expr ;
 
-expr : expr and_or expr
-     | expr equality expr
+expr : expr equality expr
+     | expr or expr
+     | expr and expr
 	 | expr mult_div expr
      | expr plus_minus expr
 	 | foo_call
@@ -42,11 +43,12 @@ locals [int i = 0;]
 
 call_arg : expr ;
 
-primitive : NUMBER | STRING | CHAR ;
-arg : ID {$fnDef::args.add($ID.text);} | NUMBER | STRING | CHAR ;
+primitive : NUMBER | STRING | CHAR | BOOLEAN;
+arg : ID {$fnDef::args.add($ID.text);} | NUMBER | STRING | CHAR | BOOLEAN;
 
-and_or : '&&' | '||';
-equality : '==' | '!=' | '<=' | '>=' | '>' | '<' ;
+and : '&&';
+or : '||';
+equality : '==' | '/=' | '<=' | '>=' | '>' | '<' ;
 mult_div : '*' | '/' ;
 plus_minus : '+' | '-'  ;
 negate : '-' | '!' ;
@@ -58,8 +60,9 @@ NUMBER : '0' | ('-'? ('1'..'9') DIGIT*)
 	   | '-'? DIGIT '.'? DIGIT+ ;
 CHAR : '\'' .*? '\'' ;
 STRING : '"' (ESC | .)*? '"' ;
+BOOLEAN : 'True' | 'False';
 
-TYPE : 'Integer' | 'Char' | 'Float' | 'String' ;
+TYPE : 'Integer' | 'Char' | 'Float' | 'String' | 'Bool';
 ID : LETTER (LETTER | DIGIT)* ;
 
 fragment LETTER : [a-zA-Z_] ;

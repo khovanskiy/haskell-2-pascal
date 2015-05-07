@@ -3,177 +3,210 @@ package com.khovanskiy.haskell.core;
 import org.antlr.v4.runtime.misc.NotNull;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Stack;
+import java.io.*;
+import java.util.*;
 
 public class HaskellToPascalListener extends HaskellBaseListener {
-    HaskellParser parser;
-    boolean first_def;
-    boolean cond;
-    Map<String, String> m;
-    Stack<Integer> args;
+    private boolean isFirstDefinition;
+    private boolean hasCondition;
+    private Map<String, String> argsNames = new HashMap<>();
+    private LinkedList<Integer> args = new LinkedList<>();
+    private final PrintStream os;
 
-    public HaskellToPascalListener(HaskellParser parser) {
-        this.parser = parser;
-        args = new Stack<Integer>();
+    public HaskellToPascalListener(PrintStream os) {
+        this.os = os;
+    }
+
+    private String convertType(String type) {
+        switch (type) {
+            case "Integer":
+                return "integer";
+            case "Float":
+                return "real";
+            case "Char":
+                return "char";
+            case "String":
+                return "string";
+            case "Bool":
+                return "boolean";
+        }
+        throw new AssertionError();
     }
 
     @Override public void enterFnDecl(@NotNull HaskellParser.FnDeclContext ctx) {
         String decl = "function " + ctx.ID() + "(";
         char cur = 'a';
         for (int i = 0; i < ctx.TYPE().size() - 1; i++) {
-            TerminalNode each = ctx.TYPE().get(i);
-            decl = decl + cur + ": " + each + ", ";
+
+            decl = decl + cur + ": " +  convertType(ctx.TYPE().get(i).getText()) + ", ";
             ++cur;
         }
 
         TerminalNode each = ctx.TYPE().get(ctx.TYPE().size() - 1);
         if(ctx.TYPE().size() == 1) {
-            decl += "): " + each + ";";
+            decl += "): " + convertType(each.getText()) + ";";
         } else {
-            decl = decl.substring(0, decl.length() - 2) + "): " + each + ";";
+            decl = decl.substring(0, decl.length() - 2) + "): " + convertType(each.getText()) + ";";
         }
 
-        System.out.println(decl);
-        System.out.println("begin");
-        this.first_def = true;
+        os.println(decl);
+        os.println("begin");
+        this.isFirstDefinition = true;
     }
 
     @Override public void exitFn(@NotNull HaskellParser.FnContext ctx) {
-        System.out.println("end;\n");
+        os.println("end;\n");
     }
 
     @Override public void enterFnDef(@NotNull HaskellParser.FnDefContext ctx) {
-        m = new HashMap<String, String>();
-        boolean first_if = true;
-        cond = false;
+        //argsNames = new HashMap<>();
+        argsNames.clear();
+        boolean isFirstCondition = true;
+        hasCondition = false;
         for(int i = 0; i < ctx.i; ++i)
         {
             if(ctx.arg(i).ID != null) {
-                if(m.containsKey(ctx.arg(i).ID().toString()))
+                if(argsNames.containsKey(ctx.arg(i).ID().toString()))
                 {
-                    if(first_if) {
-                        if(first_def) {
-                            System.out.print("\tif");
-                            first_def = false;
+                    if(isFirstCondition) {
+                        if(isFirstDefinition) {
+                            os.print("\tif");
+                            isFirstDefinition = false;
                         }
                         else {
-                            System.out.print("\telse if");
+                            os.print("\telse if");
                         }
-                        first_if = false;
+                        isFirstCondition = false;
                     } else {
-                        System.out.print(" &&");
+                        os.print(" &&");
                     }
-                    System.out.print(" (" + m.get(ctx.arg(i).ID().toString()) + " = " + String.valueOf((char) ('a' + i)) + ")");
-                    cond = true;
+                    os.print(" (" + argsNames.get(ctx.arg(i).ID().toString()) + " = " + String.valueOf((char) ('a' + i)) + ")");
+                    hasCondition = true;
                 } else {
-                    m.put(ctx.arg(i).ID().toString(), String.valueOf((char) ('a' + i)));
+                    argsNames.put(ctx.arg(i).ID().toString(), String.valueOf((char) ('a' + i)));
                 }
             } else {
-                if(first_if) {
-                    if(first_def) {
-                        System.out.print("\tif");
-                        first_def = false;
+                if(isFirstCondition) {
+                    if(isFirstDefinition) {
+                        os.print("\tif");
+                        isFirstDefinition = false;
                     }
                     else {
-                        System.out.print("\telse if");
+                        os.print("\telse if");
                     }
-                    first_if = false;
+                    isFirstCondition = false;
                 } else {
-                    System.out.print(" &&");
+                    os.print(" &&");
                 }
-                System.out.print(" (" + String.valueOf((char)('a' + i)) + " = " + ctx.arg(i).getText() + ")");
-                cond = true;
+                os.print(" (" + String.valueOf((char)('a' + i)) + " = " + ctx.arg(i).getText() + ")");
+                hasCondition = true;
             }
         }
 
         if (ctx.cond() == null) {
-            if(cond) {
-                System.out.print(" then\n\t\t");
+            if(hasCondition) {
+                os.print(" then\n\t\t");
             } else {
-                System.out.print("\t");
-                first_def = true;
+                os.print("\t");
+                isFirstDefinition = true;
             }
-            System.out.print(ctx.ID().toString() + " := ");
+            os.print(ctx.ID().toString() + " := ");
         }
     }
 
     @Override public void exitFnDef(@NotNull HaskellParser.FnDefContext ctx) {
-        System.out.println(';');
+        os.println(';');
     }
 
     @Override public void enterCond(@NotNull HaskellParser.CondContext ctx) {
-        if (!cond) {
-            if (first_def) {
-                System.out.print("\tif ");
-                first_def = false;
+        if (!hasCondition) {
+            if (isFirstDefinition) {
+                os.print("\tif ");
+                isFirstDefinition = false;
             } else {
-                System.out.print("\telse if ");
+                os.print("\telse if ");
             }
         } else {
-            System.out.print(" && ");
+            os.print(" && ");
         }
-        System.out.print("(");
+        os.print("(");
     }
 
     @Override public void exitCond(@NotNull HaskellParser.CondContext ctx) {
-        System.out.print(") then\n\t\t");
-        System.out.print(ctx.getParent().getChild(0).getText() + " := ");
+        os.print(") then\n\t\t");
+        os.print(ctx.getParent().getChild(0).getText() + " := ");
     }
 
     @Override public void enterFoo_call(@NotNull HaskellParser.Foo_callContext ctx) {
-        System.out.print(ctx.ID() + "(");
+        os.print(ctx.ID() + "(");
         args.push(ctx.i);
     }
 
     @Override public void exitFoo_call(@NotNull HaskellParser.Foo_callContext ctx) {
-        System.out.print(")");
+        os.print(")");
     }
 
     @Override public void exitCall_arg(@NotNull HaskellParser.Call_argContext ctx) {
         int v = args.pop() - 1;
         if(v != 0) {
             args.push(v);
-            System.out.print(", ");
+            os.print(", ");
         }
     }
 
-    @Override public void enterAnd_or(@NotNull HaskellParser.And_orContext ctx) {
-        System.out.print(" " + ctx.getText() + " ");
+    @Override public void enterAnd(@NotNull HaskellParser.AndContext ctx) {
+        os.print(" and ");
+    }
+
+    @Override public void enterOr(@NotNull HaskellParser.OrContext ctx) {
+        os.print(" or ");
     }
 
     @Override public void enterEquality(@NotNull HaskellParser.EqualityContext ctx) {
-        System.out.print(" " + ctx.getText() + " ");
+        if (ctx.getText().equals("==")) {
+            os.print(" = ");
+        } else if (ctx.getText().equals("/=")) {
+            os.print(" <> ");
+        } else {
+            os.print(" " + ctx.getText() + " ");
+        }
     }
 
     @Override public void enterMult_div(@NotNull HaskellParser.Mult_divContext ctx) {
-        System.out.print(" " + ctx.getText() + " ");
+        os.print(" " + ctx.getText() + " ");
     }
 
     @Override public void enterPlus_minus(@NotNull HaskellParser.Plus_minusContext ctx) {
-        System.out.print(" " + ctx.getText() + " ");
+        os.print(" " + ctx.getText() + " ");
     }
 
     @Override public void enterNegate(@NotNull HaskellParser.NegateContext ctx) {
-        System.out.print(ctx.getText());
+        if (ctx.getText().equals("!")) {
+            os.print("not ");
+        } else {
+            os.print(ctx.getText());
+        }
     }
 
     @Override public void enterPrimitive(@NotNull HaskellParser.PrimitiveContext ctx) {
-        System.out.print(ctx.getText());
+        if (ctx.getText().equals("True") || ctx.getText().equals("False")) {
+            os.print(ctx.getText().toLowerCase());
+        } else {
+            os.print(ctx.getText());
+        }
     }
 
     @Override
     public void enterOpenBracket(@NotNull HaskellParser.OpenBracketContext ctx) {
-        System.out.print(ctx.getText());
+        os.print(ctx.getText());
     }
 
     @Override
     public void enterCloseBracket(@NotNull HaskellParser.CloseBracketContext ctx) {
-        System.out.print(ctx.getText());
+        os.print(ctx.getText());
     }
 
     @Override public void enterId(@NotNull HaskellParser.IdContext ctx) {
-        System.out.print(m.get(ctx.getText()));
+        os.print(argsNames.get(ctx.getText()));
     }
 }
